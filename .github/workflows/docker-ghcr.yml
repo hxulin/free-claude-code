@@ -1,0 +1,70 @@
+name: Build & Push Docker (GHCR)
+
+on:
+  workflow_dispatch:
+    inputs:
+      extra_tag:
+        description: "Optional extra image tag (e.g. v2.0.0). Date tag yy.M.d is always pushed."
+        required: false
+        type: string
+      push_latest:
+        description: "Also push :latest"
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 1
+
+      - name: Prepare image name
+        id: prep
+        shell: bash
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY}"
+          echo "image=${image,,}" >> "${GITHUB_OUTPUT}"
+          echo "date_tag=$(date +%y.%-m.%-d)" >> "${GITHUB_OUTPUT}"
+          echo "extra_tag=${{ inputs.extra_tag }}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.prep.outputs.image }}
+          tags: |
+            type=raw,value=latest,enable=${{ inputs.push_latest }}
+            type=raw,value=${{ steps.prep.outputs.date_tag }}
+            type=raw,value=${{ steps.prep.outputs.extra_tag }},enable=${{ inputs.extra_tag != '' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
