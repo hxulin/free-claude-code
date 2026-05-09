@@ -19,7 +19,7 @@ WORKDIR /app
 
 # Sync deps first for better caching.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 
