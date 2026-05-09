@@ -1,0 +1,14 @@
+services:
+  free-claude-code:
+    image: ghcr.io/hxulin/free-claude-code:${IMAGE_TAG:-latest}
+    container_name: free-claude-code
+    ports:
+      - "${PORT:-8082}:8082"
+    env_file:
+      - .env
+    environment:
+      # Optional: override workspace path inside the container
+      CLAUDE_WORKSPACE: /data/agent_workspace
+    volumes:
+      - ./agent_workspace:/data/agent_workspace
+    restart: unless-stopped
